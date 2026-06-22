@@ -40,8 +40,7 @@ Architecture: OOP (Object-Oriented Programming) + Multithreading.
 
 Clone the repository:
 
-git clone [https://github.com/your-username/Rapportino-Alexia.git](https://github.com/your-username/Rapportino-Alexia.git)
-
+git clone https://github.com/your-username/Rapportino-Alexia.git
 
 
 Create a virtual environment and activate it:
@@ -50,17 +49,14 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
 
-
 Install requirements:
 
 pip install customtkinter pillow CTkTable
 
 
-
 Run the application:
 
 python main.py
-
 
 
 🇮🇹 Versione Italiana
@@ -97,8 +93,7 @@ Architettura: OOP (Programmazione Orientata agli Oggetti) + Multithreading.
 
 Clona il repository:
 
-git clone [https://github.com/your-username/Rapportino-Alexia.git](https://github.com/your-username/Rapportino-Alexia.git)
-
+git clone https://github.com/your-username/Rapportino-Alexia.git
 
 
 Crea un ambiente virtuale e attivalo:
@@ -107,11 +102,9 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
 
-
 Installa le dipendenze:
 
 pip install customtkinter pillow CTkTable
-
 
 
 Esegui l'applicazione:
