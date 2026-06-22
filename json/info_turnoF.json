@@ -1,0 +1,29 @@
+{
+    "F": {
+        "3DI12345/2": [
+            {
+                "data_ora": "2026-06-17 02:15:59",
+                "storico": "Coleta de amostra para o laboratório realizada pelo técnico do Turno F."
+            }
+        ],
+        "1PT00001/12": [
+            {
+                "data_ora": "2026-06-16 03:10:20",
+                "storico": "Ajuste na velocidade de avanço para corrigir rebarbas superficiais."
+            }
+        ],
+        "3DI12345/23": [
+            {
+                "data_ora": "2026-06-17 04:00:05",
+                "storico": "Manutenção autônoma (limpeza de resíduos e cavacos de metal nas guias)."
+            }
+        ],
+        "1TT00033/4": [
+            {
+                "data_ora": "2026-06-17 05:20:18",
+                "storico": "Preparação para a passagem de turno. Organização da bancada concluída."
+            }
+        ],
+        "3DI12345/1": []
+    }
+}
