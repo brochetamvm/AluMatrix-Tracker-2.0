@@ -1,4 +1,14 @@
-imagens/
-.venv/
-__pycache__/
+PDF
+Fotos
+src/imagens/
 *.pyc
+
+
+# Ambiente Virtual
+.venv/
+
+# Banco de Dados SQLite
+*.db
+
+# Cache do Python
+__pycache__/

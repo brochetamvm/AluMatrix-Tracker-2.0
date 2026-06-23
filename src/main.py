@@ -14,7 +14,6 @@
 
 import os
 import customtkinter as ctk
-import inspect
 
 from util import format_form, carrega_imagem, exec_cerca_PDF, somente_maiusculas, exec_scheda_tec, exec_rapp_elettr, exec_cerca_foto_incestatura, ler_json_path
 from frmscheda_tecnica import FormSchedaTecnica
@@ -38,7 +37,7 @@ pnl_principal = ctk.CTkFrame(frmPrincipal)
 pnl_principal.pack(fill="both", expand=True, pady=20, padx=20)
 
 # titulo - imagem
-logo_img = carrega_imagem(r"imagens\logo.png", 310, 65)
+logo_img = carrega_imagem(r"src\imagens\logo.png", 310, 65)
 lbl_titulo = ctk.CTkLabel(pnl_principal, image=logo_img, text="")
 lbl_titulo.pack(pady=50)
 

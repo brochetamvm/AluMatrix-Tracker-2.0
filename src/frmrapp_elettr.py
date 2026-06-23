@@ -2,11 +2,14 @@ import customtkinter as ctk
 import threading
 import json
 import tkinter as tk
+import requests
 
 from tkinter import messagebox
 from datetime import datetime
 from CTkTable import CTkTable
 from frmmodific_rapp_elettr import FormModific_Rapp_Elettr
+
+API_URL = "http://127.0.0.1:8000"
 
 class FormRappElettr(ctk.CTkToplevel):    
     def __init__(self, master, matrice, *args, **kwargs):
@@ -75,6 +78,7 @@ class FormRappElettr(ctk.CTkToplevel):
         # aparecer lisa na tela e estabilizar o estado 'zoomed'.
         self.after(100, self.iniciar_thread_carregamento)    
 
+    '''
     def adicionar_info_JSON(self, turno, data_ora, storico):
         # Executa a leitura, inserção e reescrita do JSON em uma Thread separada
         # para garantir a alta performance da interface gráfica.
@@ -140,6 +144,43 @@ class FormRappElettr(ctk.CTkToplevel):
         # Dispara a thread em background de modo daemon
         thread_insercao = threading.Thread(target=salvar_novo_registro, daemon=True)
         thread_insercao.start()
+    '''
+
+    def adicionar_info_JSON(self, turno, data_ora, storico):
+        # Agora essa função manda os dados para a API em vez de gravar no arquivo JSON
+        def salvar_novo_registro():
+            try:
+                # 1. Prepara o pacote com o molde exato que o Pydantic exige no servidor
+                dados_para_api = {
+                    "matrice": self.cod_matrice,
+                    "turno": turno,
+                    "storico": storico
+                }
+
+                # 2. Faz o "telefone" (POST) para o servidor, enviando o pacote como JSON
+                resposta = requests.post(f"{API_URL}/rapportini/", json=dados_para_api, timeout=5)
+
+                # 3. Verifica se o servidor respondeu com Sucesso (Status 200 OK)
+                if resposta.status_code == 200:
+                    # Sucesso! Sincronizamos a memória local para a tabela recarregar perfeitamente
+                    registros_atualizados = requests.get(f"{API_URL}/rapportini/{self.cod_matrice}").json()
+                    registros_turno = [reg for reg in registros_atualizados if reg["turno"] == turno]
+                    
+                    nova_lista_string = json.dumps(registros_turno, indent=4)
+                    if turno == "D": self.dadosD = nova_lista_string
+                    elif turno == "E": self.dadosE = nova_lista_string
+                    elif turno == "F": self.dadosF = nova_lista_string
+                else:
+                    self.after(0, lambda: messagebox.showerror("Erro da API", f"O servidor recusou os dados: {resposta.text}", parent=self))
+
+            except requests.exceptions.ConnectionError:
+                self.after(0, lambda: messagebox.showerror("Erro de Conexão", "Não foi possível conectar ao Servidor AluMatrix. O registro não foi salvo.", parent=self))
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Erro Crítico", f"Falha ao enviar dados:\n\n[{e}]", parent=self))
+
+        # Dispara a thread em background (como você já fazia com maestria)
+        thread_insercao = threading.Thread(target=salvar_novo_registro, daemon=True)
+        thread_insercao.start()    
 
     # ATUALIZAR HISTORICO INSERIDO
     def atualizar_tabelas(self, turno, historico, registro_edicao=None):
@@ -406,7 +447,9 @@ class FormRappElettr(ctk.CTkToplevel):
         except Exception:
             menu.tk_popup(event.x_root, event.y_root)
         
-    # FUNÇÃO PARA CARREGAR DADOS DO JSON
+
+    '''    
+    # FUNÇÃO PARA CARREGAR DADOS DO JSON (local)
     def carregar_dados_JSON(self, turno, matrice):
         try:
             path_json = "info_turno" + turno + ".json"
@@ -437,6 +480,33 @@ class FormRappElettr(ctk.CTkToplevel):
                 else:
                     return {}
         except FileNotFoundError:
+            return {}
+    '''        
+
+    # FUNÇÃO PARA CARREGAR DADOS DA API SQL (Substitui o JSON local)
+    def carregar_dados_JSON(self, turno, matrice):
+        try:
+            # Bate na porta GET do Servidor
+            resposta = requests.get(f"{API_URL}/rapportini/{matrice}", timeout=5)
+            
+            if resposta.status_code == 200:
+                registros_api = resposta.json() # O servidor devolve uma lista de dicionários
+                
+                # Filtra apenas os registros do turno específico que estamos a montar
+                registros_turno = [reg for reg in registros_api if reg["turno"] == turno]
+                
+                if len(registros_turno) > 0:
+                    # Converte de volta para string (pois a sua tela atual espera uma string JSON)
+                    return json.dumps(registros_turno, indent=4)
+                else:
+                    return {}
+            else:
+                messagebox.showerror("", f"Errore na API: {resposta.status_code}")  
+                return {}
+                
+        except requests.exceptions.ConnectionError:
+            # Se o servidor estiver desligado, o programa não trava, apenas não carrega os dados
+            messagebox.showerror("", "Errore critico: impossibile connettersi al server AluMatrix.")  
             return {}
         
     # EXECUTA A ALTERACAO LÓGICA E VISUAL

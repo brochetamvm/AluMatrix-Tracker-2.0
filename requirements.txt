@@ -1,0 +1,7 @@
+customtkinter
+CTkTable
+pillow
+fastapi
+uvicorn
+requests
+sqlalchemy

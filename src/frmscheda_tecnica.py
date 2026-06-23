@@ -208,7 +208,7 @@ class FormSchedaTecnica(ctk.CTkToplevel):
             self.verificar_alteracoes()
 
     def renderizar_formulario_recursivo(self):
-        from scheda_tecnica import scheda_tecnica
+        from src.scheda_tecnica import scheda_tecnica
         
         # --- 1. GENERALE ---
         card_geral = CartaoExpandivel(self.scroll_principal, titulo="PRESSA")
@@ -311,7 +311,7 @@ class FormSchedaTecnica(ctk.CTkToplevel):
         return var, int_row, int_col
 
     def _obter_classe_por_escopo(self, escopo):
-        from scheda_tecnica import scheda_tecnica
+        from src.scheda_tecnica import scheda_tecnica
         if escopo == "principal": return scheda_tecnica
         classe = scheda_tecnica
         try:
