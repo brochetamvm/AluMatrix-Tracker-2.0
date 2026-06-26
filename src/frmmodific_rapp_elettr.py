@@ -14,7 +14,7 @@ class FormModific_Rapp_Elettr(ctk.CTkToplevel):
 
         self.title(f"Aggiunge nuovo storico - Articolo: {self.cod_matrice}")
         format_form(710, 440, self)
-        self.resizable(False, False)        
+        #self.resizable(False, False)        
 
         # Comportamento de foco e prioridade na tela
         self.transient(master)
@@ -27,7 +27,7 @@ class FormModific_Rapp_Elettr(ctk.CTkToplevel):
         self.pnl_principal.pack(fill="both", expand=True, pady=20, padx=20)
 
         self.pnl_principal.grid_rowconfigure(0, weight=1)
-        self.pnl_principal.grid_rowconfigure(1, weight=3)
+        self.pnl_principal.grid_rowconfigure(1, weight=2)
         self.pnl_principal.grid_rowconfigure(2, weight=1)
         self.pnl_principal.grid_columnconfigure(0, weight=1)
 

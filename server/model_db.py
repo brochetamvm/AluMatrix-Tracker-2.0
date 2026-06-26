@@ -12,3 +12,7 @@ class RapportinoCreate(BaseModel):
     matrice: str
     turno: TipoTurno
     storico: str
+    
+# Quando formos editar, o operador só vai alterar o texto do histórico
+class RapportinoUpdate(BaseModel):
+    storico: str

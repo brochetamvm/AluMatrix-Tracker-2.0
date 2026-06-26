@@ -56,7 +56,7 @@ edit_matrice.bind("<Return>", key_press_campo)
 somente_maiusculas(edit_matrice)
 
 # para teste
-#edit_matrice.insert(0, "3DI12345/1")
+edit_matrice.insert(0, "3DI12345/1")
 
 # label separador
 lbl_sep = ctk.CTkLabel(pnl_principal, text="", font=("", 1))

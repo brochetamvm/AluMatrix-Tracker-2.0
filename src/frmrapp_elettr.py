@@ -21,17 +21,17 @@ class FormRappElettr(ctk.CTkToplevel):
         # Configurações da Janela
         self.title(f"Rapportino Elettronico - Articolo: {self.cod_matrice}")
         self.state('zoomed')        
-        self.resizable(False, False)
+        #self.resizable(False, False)
 
         # Panel principal que contem tudo
         self.pnl_principal = ctk.CTkFrame(self)
-        self.pnl_principal.pack(fill="both", expand=True, pady=5, padx=20)
+        self.pnl_principal.pack(fill="both", expand=True, pady=(5, 60), padx=20)
 
         # Comportamento de foco e prioridade na tela        
         self.lift()
         self.focus_force()
         self.transient(master) # Mantém a janela sempre na frente da principal SEM quebrar os menus de clique direito!
-        #self.grab_set()  # Torna a janela modal (opcional, impede clicar na principal enquanto aberta)
+        self.grab_set()  # Torna a janela modal (opcional, impede clicar na principal enquanto aberta)
 
         # panel titutlo
         self.pnl_titulo = ctk.CTkFrame(self.pnl_principal)
@@ -61,7 +61,7 @@ class FormRappElettr(ctk.CTkToplevel):
                                          font=("Consolas", 18, "bold"), 
                                          anchor="center", 
                                          command=click_btn_rapp_elettr_inc)        
-        
+
         # criacao da tela da barra de progresso
         self.pnl_loading = ctk.CTkFrame(self.pnl_principal, fg_color="transparent")
         self.pnl_loading.pack(expand=True, fill="both")
@@ -74,9 +74,9 @@ class FormRappElettr(ctk.CTkToplevel):
         self.progress_bar.pack(pady=5)        
         self.progress_bar.start()
 
-        # Em vez de iniciar a Thread direto, damos 400ms para a animação da barra 
+        # Em vez de iniciar a Thread direto, damos 200ms para a animação da barra 
         # aparecer lisa na tela e estabilizar o estado 'zoomed'.
-        self.after(100, self.iniciar_thread_carregamento)    
+        self.after(200, self.iniciar_thread_carregamento)    
 
     '''
     def adicionar_info_JSON(self, turno, data_ora, storico):
@@ -146,37 +146,37 @@ class FormRappElettr(ctk.CTkToplevel):
         thread_insercao.start()
     '''
 
-    def adicionar_info_JSON(self, turno, data_ora, storico):
+    def adicionar_info_JSON(self, turno, storico):
         # Agora essa função manda os dados para a API em vez de gravar no arquivo JSON
         def salvar_novo_registro():
             try:
-                # 1. Prepara o pacote com o molde exato que o Pydantic exige no servidor
+                # Prepara o pacote com o molde exato que o Pydantic exige no servidor
                 dados_para_api = {
                     "matrice": self.cod_matrice,
                     "turno": turno,
                     "storico": storico
                 }
 
-                # 2. Faz o "telefone" (POST) para o servidor, enviando o pacote como JSON
+                # Faz o "telefone" (POST) para o servidor, enviando o pacote como JSON
                 resposta = requests.post(f"{API_URL}/rapportini/", json=dados_para_api, timeout=5)
 
-                # 3. Verifica se o servidor respondeu com Sucesso (Status 200 OK)
+                # Verifica se o servidor respondeu com Sucesso (Status 200 OK)
                 if resposta.status_code == 200:
-                    # Sucesso! Sincronizamos a memória local para a tabela recarregar perfeitamente
+                    # Sucesso! Sincronizacao com a memória local para a tabela recarregar perfeitamente
                     registros_atualizados = requests.get(f"{API_URL}/rapportini/{self.cod_matrice}").json()
                     registros_turno = [reg for reg in registros_atualizados if reg["turno"] == turno]
                     
                     nova_lista_string = json.dumps(registros_turno, indent=4)
-                    if turno == "D": self.dadosD = nova_lista_string
-                    elif turno == "E": self.dadosE = nova_lista_string
-                    elif turno == "F": self.dadosF = nova_lista_string
+                    if turno == "D": self.dadosD = nova_lista_string; self.dadosD_bd = nova_lista_string
+                    elif turno == "E": self.dadosE = nova_lista_string; self.dadosE_bd = nova_lista_string
+                    elif turno == "F": self.dadosF = nova_lista_string; self.dadosF_bd = nova_lista_string
                 else:
-                    self.after(0, lambda: messagebox.showerror("Erro da API", f"O servidor recusou os dados: {resposta.text}", parent=self))
+                    self.after(0, lambda: messagebox.showerror("Error API", f"The server rejected the data. {resposta.text}", parent=self))
 
             except requests.exceptions.ConnectionError:
-                self.after(0, lambda: messagebox.showerror("Erro de Conexão", "Não foi possível conectar ao Servidor AluMatrix. O registro não foi salvo.", parent=self))
+                self.after(0, lambda: messagebox.showerror("Connection Erroro", "We were unable to connect to the AluMatrix Server. The record was not saved.", parent=self))
             except Exception as e:
-                self.after(0, lambda: messagebox.showerror("Erro Crítico", f"Falha ao enviar dados:\n\n[{e}]", parent=self))
+                self.after(0, lambda: messagebox.showerror("Critical Error", f"Failed to send data:\n\n[{e}]", parent=self))
 
         # Dispara a thread em background (como você já fazia com maestria)
         thread_insercao = threading.Thread(target=salvar_novo_registro, daemon=True)
@@ -207,8 +207,11 @@ class FormRappElettr(ctk.CTkToplevel):
 
             self.vincular_clique_direito_tabela(tabela_alvo, turno)       
 
+            # Dispara a atualização para o SERVIDOR via API 
+            self.atualizar_info_API(registro_edicao["id_banco_dados"], turno, historico)
+
             # Dispara a atualização do arquivo JSON em background
-            self.alterar_no_json_background(turno, data_ora_json, historico)
+            #self.alterar_no_json_background(turno, data_ora_json, historico)
             return
         
         # Data formatada para salvar no JSON padronizado ISO
@@ -219,7 +222,7 @@ class FormRappElettr(ctk.CTkToplevel):
         nova_linha = [data_atual_formatada, historico]
 
         # funcao adiciona info JSON
-        self.adicionar_info_JSON(turno, data_atual, historico)
+        self.adicionar_info_JSON(turno, historico)
 
         # SE A TABELA NÃO EXISTE (Turno estava vazio com a label "Nessuno storico...")
         if not hasattr(self, 'dic_tabelas') or turno not in self.dic_tabelas:
@@ -317,22 +320,19 @@ class FormRappElettr(ctk.CTkToplevel):
                 self.destroy()
                 return  
         else:
-            self.registro_0(None, "F")
-
-        pnl_turnos.pack(fill="both", expand=True, pady=10, padx=10)
+            self.registro_0(None, "F")               
 
         # Destruímos o loading e exibimos o container já montado no exato mesmo momento!
         try:
             self.progress_bar.stop()
             self.pnl_loading.destroy()
         except:
-            pass        
+            pass     
 
-        # Coloca botao de incluir na tela
+        pnl_turnos.pack(fill="both", expand=True, pady=10, padx=10)
         self.btn_incluir.pack(side="right", padx=15, pady=10)  
-
-        # Força o CustomTkinter a processar e desenhar internamente tudo o que criamos acima
-        self.update_idletasks()
+        # Força o CustomTkinter a desenhar tudo de uma vez só!
+        #self.update_idletasks()
 
     # CONTROI GRID DE INFORMACOES ENCONTRADAS NO JSON
     def Carrega_tabelas_historicos(self, turno):
@@ -393,7 +393,7 @@ class FormRappElettr(ctk.CTkToplevel):
             nome_tabela.edit_column(0, width=200)
             nome_tabela.edit_column(1, width=800, anchor="w")
 
-            nome_tabela.update_values(nome_tabela.values)        
+            #nome_tabela.update_values(nome_tabela.values)        
 
             # Chama a função auxiliar para colocar os cliques direito na criação
             self.vincular_clique_direito_tabela(nome_tabela, turno)
@@ -511,20 +511,26 @@ class FormRappElettr(ctk.CTkToplevel):
         
     # EXECUTA A ALTERACAO LÓGICA E VISUAL
     def alterar_registro_tabela(self, tabela_alvo, turno, linha):
-        # Recupera os dados direto da linha da tabela
         dados_linha = tabela_alvo.values[linha]
         data_ora_tela = dados_linha[0]
         historico_antigo = dados_linha[1]
 
-        # Monta o pacote de dados que a tela de edição precisa saber
+        # 1. Pesca o ID invisível na memória
+        if turno == "D": info = json.loads(self.dadosD)
+        elif turno == "E": info = json.loads(self.dadosE)
+        elif turno == "F": info = json.loads(self.dadosF)
+        
+        indice_real = linha - 1
+        id_invisivel = info[indice_real]["id"]
+
         registro_edicao = {
-            "linha_index": linha,          # Guarda qual linha da tabela da tela deve atualizar
-            "turno": turno,                # Turno atual locked
-            "data_ora_antigo": data_ora_tela, # Usado para achar a linha visual
+            "id_banco_dados": id_invisivel, # <-- Agora a tela de edição sabe quem é o ID!
+            "linha_index": linha,
+            "turno": turno,                
+            "data_ora_antigo": data_ora_tela, 
             "storico_antigo": historico_antigo
         }
 
-        # Abre a tela de inclusão passando o parâmetro de edição
         if self.janela_rapp_eletr_inc is not None and self.janela_rapp_eletr_inc.winfo_exists():
             self.janela_rapp_eletr_inc.lift()
             self.janela_rapp_eletr_inc.focus_force()
@@ -533,7 +539,7 @@ class FormRappElettr(ctk.CTkToplevel):
                 master=self, 
                 matrice=self.cod_matrice,
                 registro_edicao=registro_edicao,
-                on_save=self.atualizar_tabelas # Usa a mesma função, ela vai tratar se é edição
+                on_save=self.atualizar_tabelas 
             )
 
     # EXECUTA A REMOÇÃO LÓGICA E VISUAL
@@ -549,7 +555,7 @@ class FormRappElettr(ctk.CTkToplevel):
             f"Vuoi davvero eliminare questo storico?\n\nData: {data_ora_tela}\nStorico: {historico}",
             parent=self
         )
-        
+        ''' exclusao local
         if confirmar:
             try:
                 # Converte o formato da tela para o padrão ISO do JSON antes de apagar
@@ -579,6 +585,31 @@ class FormRappElettr(ctk.CTkToplevel):
 
             except Exception as e:
                 messagebox.showerror("Erro", f"Non è stato possibile eliminare:\n\n[{e}]", parent=self)
+        '''
+        # exclusao server
+        if confirmar:
+            # Puxa os dados reais da memória
+            if turno == "D": info = json.loads(self.dadosD)
+            elif turno == "E": info = json.loads(self.dadosE)
+            elif turno == "F": info = json.loads(self.dadosF)
+
+            # 2. Encontra o ID invisível (linha clicada - 1 por causa do cabeçalho)
+            indice_real = linha - 1
+            id_invisivel = info[indice_real]["id"]
+
+            # 3. Dispara para o Servidor deletar no SQL!
+            self.apagar_info_API(id_registro=id_invisivel, turno=turno)
+
+            # 4. Remove a linha da tela instantaneamente para o usuário não ficar esperando
+            tabela_alvo.delete_row(index=linha)
+            tabela_alvo.update_values(tabela_alvo.values)     
+
+            if len(tabela_alvo.values) <= 1:
+                if hasattr(self, 'dic_tabelas') and turno in self.dic_tabelas:
+                    del self.dic_tabelas[turno]
+                self.registro_0(None, turno)
+                
+            self.vincular_clique_direito_tabela(tabela_alvo, turno)
 
     # ATUALIZAR O VISUAL DA TABELA QUANDO NAO TEM REGISTRO
     def registro_0(self, tabela_alvo, turno):
@@ -596,7 +627,7 @@ class FormRappElettr(ctk.CTkToplevel):
                 self.nome_lbl_erro = ctk.CTkLabel(container, text=f"Nessuno storico trovato. [TURNO {turno}]", 
                                                     text_color="gray", font=("Consolas", 14, "bold"))
                 self.nome_lbl_erro.pack(expand=True, pady=20)
-
+    '''
     # EXCLUIR REGISTRO DO JASON
     def remover_do_json_background(self, turno, data_ora_alvo):
         def buscar_e_excluir():
@@ -662,6 +693,7 @@ class FormRappElettr(ctk.CTkToplevel):
         # Dispara o processo em background
         thread_exclusao = threading.Thread(target=buscar_e_excluir, daemon=True)
         thread_exclusao.start()
+    '''    
 
     # FUNÇÃO AUXILIAR PARA REAPLICAR OS BINDS DO CLIQUE DIREITO
     def vincular_clique_direito_tabela(self, tabela, turno):
@@ -682,6 +714,7 @@ class FormRappElettr(ctk.CTkToplevel):
             for child in widget.winfo_children():
                 child.bind("<Button-3>", disparar_menu)
 
+    '''
     # ALTERAR REGISTRO NO JSON EM BACKGROUND
     def alterar_no_json_background(self, turno, data_ora_alvo, novo_historico):
         def buscar_e_alterar():
@@ -733,4 +766,71 @@ class FormRappElettr(ctk.CTkToplevel):
 
         # Roda o processo em background para não travar os cliques da tela
         thread_edicao = threading.Thread(target=buscar_e_alterar, daemon=True)
+        thread_edicao.start()
+    '''
+
+    def apagar_info_API(self, id_registro, turno):
+        def deletar_registro():
+            try:
+                # Bate na porta DELETE do servidor passando o ID
+                resposta = requests.delete(f"{API_URL}/rapportini/{id_registro}", timeout=5)
+
+                # Se o servidor confirmar a exclusão (200 OK)
+                if resposta.status_code == 200:
+                    # Sincroniza a memória local puxando os dados atualizados
+                    registros_atualizados = requests.get(f"{API_URL}/rapportini/{self.cod_matrice}").json()
+                    registros_turno = [reg for reg in registros_atualizados if reg["turno"] == turno]
+                    
+                    nova_lista_string = json.dumps(registros_turno, indent=4)
+                    
+                    # Atualiza a variável do turno correspondente (Isso fará sua CTkTable/Grid se redesenhar)
+                    if turno == "D": self.dadosD = nova_lista_string
+                    elif turno == "E": self.dadosE = nova_lista_string
+                    elif turno == "F": self.dadosF = nova_lista_string
+                else:
+                    self.after(0, lambda: messagebox.showerror("Error API", f"The server refused the deletion: {resposta.text}", parent=self))
+
+            except requests.exceptions.ConnectionError:
+                self.after(0, lambda: messagebox.showerror("Connection Error", "Unable to connect to the AluMatrix Server.", parent=self))
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Critical Error", f"Data deletion failed:\n\n[{e}]", parent=self))
+
+        # Dispara a thread em background
+        thread_exclusao = threading.Thread(target=deletar_registro, daemon=True)
+        thread_exclusao.start()  
+
+
+    def atualizar_info_API(self, id_registro, turno, novo_storico):
+        def editar_registro():
+            try:
+                # Empacota o novo texto seguindo o modelo Pydantic (RapportinoUpdate)
+                dados_para_api = {
+                    "storico": novo_storico
+                }
+
+                # Bate na porta PUT do servidor passando o ID e o novo texto
+                resposta = requests.put(f"{API_URL}/rapportini/{id_registro}", json=dados_para_api, timeout=5)
+
+                # Se o servidor confirmar a alteração (200 OK)
+                if resposta.status_code == 200:
+                    # Sincroniza a memória local puxando os dados atualizados
+                    registros_atualizados = requests.get(f"{API_URL}/rapportini/{self.cod_matrice}").json()
+                    registros_turno = [reg for reg in registros_atualizados if reg["turno"] == turno]
+                    
+                    nova_lista_string = json.dumps(registros_turno, indent=4)
+                    
+                    # Atualiza a variável do turno
+                    if turno == "D": self.dadosD = nova_lista_string
+                    elif turno == "E": self.dadosE = nova_lista_string
+                    elif turno == "F": self.dadosF = nova_lista_string
+                else:
+                    self.after(0, lambda: messagebox.showerror("Error API", f"The server rejected the change: {resposta.text}", parent=self))
+
+            except requests.exceptions.ConnectionError:
+                self.after(0, lambda: messagebox.showerror("Connection Error", "Unable to connect to the AluMatrix Server.", parent=self))
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Critical Error", f"Failed to edit data:\n\n[{e}]", parent=self))
+
+        # Dispara a thread em background
+        thread_edicao = threading.Thread(target=editar_registro, daemon=True)
         thread_edicao.start()
