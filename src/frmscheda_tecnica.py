@@ -4,6 +4,7 @@ import inspect
 import customtkinter as ctk
 import threading
 import requests
+import tempfile
 
 from enum import Enum
 from tkinter import messagebox, filedialog
@@ -237,15 +238,32 @@ class FormSchedaTecnica(ctk.CTkToplevel):
                 
             caminho_nativo = os.path.normpath(caminho.strip())
 
-            if caminho_nativo.lower().endswith(".pdf"):
-                self.btn_imagem.configure(image=None, text=f"DOCUMENTO PDF ALLEGATO:\n\n{os.path.basename(caminho_nativo)}\n\n(Impossibile mostrare l'anteprima)", fg_color="transparent", border_width=1)
-                self.btn_imagem.image = None
-                return
-
             if not os.path.exists(caminho_nativo):
-                self.btn_imagem.configure(image=None, text=f"FILE NON TROVATO:\n\n{caminho_nativo}", fg_color="transparent", border_width=1)
-                self.btn_imagem.image = None
-                return
+                codigo_limpo = self.cod_matrice.replace("/", "-").replace("\\", "-")
+                _, ext = os.path.splitext(caminho_nativo)
+                nome_arquivo_server = f"{codigo_limpo}{ext}"
+                
+                try:
+                    # Tenta ir buscar ao servidor
+                    url_download = f"{API_URL}/scheda/imagem/{nome_arquivo_server}"
+                    resposta_img = requests.get(url_download, timeout=5)
+                    
+                    if resposta_img.status_code == 200:
+                        # Se encontrou, salva na pasta TEMP do Windows
+                        pasta_temp = os.path.join(tempfile.gettempdir(), "AluMatrix")
+                        os.makedirs(pasta_temp, exist_ok=True)
+                        caminho_nativo = os.path.join(pasta_temp, nome_arquivo_server)
+                        
+                        with open(caminho_nativo, "wb") as f:
+                            f.write(resposta_img.content)
+                    else:
+                        self.btn_imagem.configure(image=None, text=f"IMMAGINE NON TROVATA\nSUL SERVER ({nome_arquivo_server})", fg_color="transparent", border_width=1)
+                        self.btn_imagem.image = None
+                        return
+                except:
+                    self.btn_imagem.configure(image=None, text=f"ERRORE DI RETE\nImpossibile connettersi al server.", fg_color="transparent", border_width=1)
+                    self.btn_imagem.image = None
+                    return
 
             img_pil = Image.open(caminho_nativo)
             img_ctk = ctk.CTkImage(light_image=img_pil, dark_image=img_pil, size=(520, 400))
@@ -492,6 +510,22 @@ class FormSchedaTecnica(ctk.CTkToplevel):
             chave_final = f"{self.cod_matrice}|{self.liga_selecionada}"
             self.banco_completo[chave_final] = dados_finais
             
+            # upload do disegno tecnico (background)
+            path_imagem = self.inputs["principal"]["disegno_tec"].get()
+            
+            if path_imagem and os.path.exists(path_imagem):
+                codigo_limpo = self.cod_matrice.replace("/", "-").replace("\\", "-")
+                url_upload = f"{API_URL}/scheda/upload/imagem/{codigo_limpo}"
+                
+                try:
+                    with open(path_imagem, "rb") as f:
+                        nome_original = os.path.basename(path_imagem)
+                        pacote = {"file": (nome_original, f, "application/octet-stream")}
+                        # Dispara para o servidor e não liga se demorar
+                        requests.post(url_upload, files=pacote, timeout=5)
+                except Exception:
+                    pass # Se falhar o upload da foto, não bloqueia o salvamento dos dados
+
             # ENVIO PARA A API
             resposta = requests.post(f"{API_URL}/scheda/salvar", json=self.banco_completo, timeout=10)
             

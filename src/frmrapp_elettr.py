@@ -1,6 +1,5 @@
 import customtkinter as ctk
 import threading
-import json
 import tkinter as tk
 import requests
 
@@ -179,11 +178,10 @@ class FormRappElettr(ctk.CTkToplevel):
                     # Sincronizacao com a memória local para a tabela recarregar perfeitamente
                     registros_atualizados = requests.get(f"{API_URL}/rapportini/{self.cod_matrice}").json()
                     registros_turno = [reg for reg in registros_atualizados if reg["turno"] == turno]
-                    
-                    nova_lista_string = json.dumps(registros_turno, indent=4)
-                    if turno == "D": self.dadosD = nova_lista_string
-                    elif turno == "E": self.dadosE = nova_lista_string
-                    elif turno == "F": self.dadosF = nova_lista_string
+
+                    if turno == "D": self.dadosD = registros_turno
+                    elif turno == "E": self.dadosE = registros_turno
+                    elif turno == "F": self.dadosF = registros_turno
                 else:
                     self.after(0, lambda: messagebox.showerror("Error API", f"The server rejected the data. {resposta.text}", parent=self))
 
@@ -249,9 +247,9 @@ class FormRappElettr(ctk.CTkToplevel):
                 
                 # Sincroniza a variável de dados local com o novo registro para a tabela ler
                 dados_novos = [{"data_ora": data_atual, "storico": historico}]
-                if turno == "D": self.dadosD = json.dumps(dados_novos)
-                elif turno == "E": self.dadosE = json.dumps(dados_novos)
-                elif turno == "F": self.dadosF = json.dumps(dados_novos)
+                if turno == "D": self.dadosD = dados_novos
+                elif turno == "E": self.dadosE = dados_novos
+                elif turno == "F": self.dadosF = dados_novos
                 
                 # Reconstrói a tabela do zero de forma limpa
                 self.carrega_info_tabelas_historicos(turno)
@@ -272,7 +270,7 @@ class FormRappElettr(ctk.CTkToplevel):
     #####################################################################################################################################
 
 
-    # CONTROI GRID DE INFORMACOES ENCONTRADAS NO JSON
+    # CONTROI GRID DE INFORMACOES ENCONTRADAS NA LISTA
     def carrega_info_tabelas_historicos(self, turno):
         # Prepara os dados no formato que a CTkTable precisa (Lista de Listas)   
         try:        
@@ -280,27 +278,21 @@ class FormRappElettr(ctk.CTkToplevel):
             container = getattr(self, f"{nome_pnl}", None)               
 
             nome_lbl = getattr(self, "lbl_turno" + turno, None) 
-            nome_lbl = ctk.CTkLabel(container, text=f"Turno {turno}", font=ctk.CTkFont(weight="bold"), text_color="#ffffff", height=20, anchor="center")
+            nome_lbl = ctk.CTkLabel(container, text=f"Turno {turno}", font=ctk.CTkFont(weight="bold"), 
+                                    text_color="#ffffff", height=20, anchor="center")
             nome_lbl.pack(fill="both")  
 
             # A primeira linha precisa ser o cabeçalho 
             dados_tabela = [["DATA ORA", "STORICO"]]
 
-            if turno == "D": info = self.dadosD
-            elif turno == "E": info = self.dadosE
-            elif turno == "F": info = self.dadosF
+            # info agora é uma lista direta
+            info = getattr(self, f"dados{turno}")
 
-            if isinstance(info, str):
-                info = json.loads(info)
-
-            # Adiciona as linhas do JSON para dentro da lista
             for item in info:
+                # O servidor já entrega formatado, mas para exibição fazemos o parse
                 data_objeto = datetime.strptime(item["data_ora"], "%Y-%m-%d %H:%M:%S") 
-
                 data_formatada = data_objeto.strftime("%d/%m/%Y %H:%M:%S")
-
-                linha = [data_formatada, item.get("storico", "").strip()]
-                dados_tabela.append(linha)
+                dados_tabela.append([data_formatada, item["storico"].strip()])
 
             # Cria o Frame rolável apenas para envelopar a tabela
             nome_scroll = getattr(self, "pnl_scroll" + turno, None) 
@@ -378,28 +370,14 @@ class FormRappElettr(ctk.CTkToplevel):
     # FUNÇÃO PARA CARREGAR DADOS DA API
     def carregar_dados_API(self, turno, matrice):
         try:
-            # Bate na porta GET do Servidor
             resposta = requests.get(f"{API_URL}/rapportini/{matrice}", timeout=5)
             
             if resposta.status_code == 200:
-                registros_api = resposta.json() # O servidor devolve uma lista de dicionários
-                
-                # Filtra apenas os registros do turno específico que estamos a montar
-                registros_turno = [reg for reg in registros_api if reg["turno"] == turno]
-                
-                if len(registros_turno) > 0:
-                    # Converte de volta para string (pois a tela atual espera uma string JSON)
-                    return json.dumps(registros_turno, indent=4)
-                else:
-                    return {}
+                return [reg for reg in resposta.json() if reg["turno"] == turno]
             else:
-                messagebox.showerror("", f"Errore na API: {resposta.status_code}")  
-                return {}
-                
-        except requests.exceptions.ConnectionError:
-            # Se o servidor estiver desligado, o programa não trava, apenas não carrega os dados
-            messagebox.showerror("", "Errore critico: impossibile connettersi al server AluMatrix.")  
-            return {}
+                return []
+        except:
+            return []
     ####################################################################################################################
     
 
@@ -409,9 +387,7 @@ class FormRappElettr(ctk.CTkToplevel):
         data_ora_tela = dados_linha[0]
         historico_antigo = dados_linha[1]
         
-        if turno == "D": info = json.loads(self.dadosD)
-        elif turno == "E": info = json.loads(self.dadosE)
-        elif turno == "F": info = json.loads(self.dadosF)
+        info = getattr(self, f"dados{turno}")
         
         # Pesca o ID invisível na memória
         indice_real = linha - 1
@@ -449,9 +425,7 @@ class FormRappElettr(ctk.CTkToplevel):
         # exclusao server
         if confirmar:
             # Puxa os dados reais da memória
-            if turno == "D": info = json.loads(self.dadosD)
-            elif turno == "E": info = json.loads(self.dadosE)
-            elif turno == "F": info = json.loads(self.dadosF)
+            info = getattr(self, f"dados{turno}")
 
             # Encontra o ID invisível
             indice_real = linha - 1
@@ -525,12 +499,10 @@ class FormRappElettr(ctk.CTkToplevel):
                     registros_atualizados = requests.get(f"{API_URL}/rapportini/{self.cod_matrice}").json()
                     registros_turno = [reg for reg in registros_atualizados if reg["turno"] == turno]
                     
-                    nova_lista_string = json.dumps(registros_turno, indent=4)
-                    
                     # Atualiza a variável do turno correspondente (Isso fará sua CTkTable/Grid se redesenhar)
-                    if turno == "D": self.dadosD = nova_lista_string
-                    elif turno == "E": self.dadosE = nova_lista_string
-                    elif turno == "F": self.dadosF = nova_lista_string
+                    if turno == "D": self.dadosD = registros_turno
+                    elif turno == "E": self.dadosE = registros_turno
+                    elif turno == "F": self.dadosF = registros_turno
                 else:
                     self.after(0, lambda: messagebox.showerror("Error API", f"The server refused the deletion: {resposta.text}", parent=self))
 
@@ -561,12 +533,10 @@ class FormRappElettr(ctk.CTkToplevel):
                     registros_atualizados = requests.get(f"{API_URL}/rapportini/{self.cod_matrice}").json()
                     registros_turno = [reg for reg in registros_atualizados if reg["turno"] == turno]
                     
-                    nova_lista_string = json.dumps(registros_turno, indent=4)
-                    
                     # Atualiza a variável do turno
-                    if turno == "D": self.dadosD = nova_lista_string
-                    elif turno == "E": self.dadosE = nova_lista_string
-                    elif turno == "F": self.dadosF = nova_lista_string
+                    if turno == "D": self.dadosD = registros_turno
+                    elif turno == "E": self.dadosE = registros_turno
+                    elif turno == "F": self.dadosF = registros_turno
                 else:
                     self.after(0, lambda: messagebox.showerror("Error API", f"The server rejected the change: {resposta.text}", parent=self))
 

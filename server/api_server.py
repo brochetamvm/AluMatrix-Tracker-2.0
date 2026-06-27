@@ -1,10 +1,11 @@
 import uvicorn
 import os
+import shutil
 
 from server import model_bd
 from datetime import datetime
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy import create_engine
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File 
+from sqlalchemy import create_engine, desc
 from sqlalchemy.orm import declarative_base, Session
 from server.model_db_valid import RapportinoCreate, RapportinoUpdate
 from fastapi.responses import FileResponse
@@ -106,6 +107,37 @@ def salvar_scheda(dados: dict, db: Session = Depends(get_db)):
 ####################################################################################################################
 
 
+# ROTA GET: Envia o desenho técnico para o PC que pedir
+@app.get("/scheda/imagem/{nome_arquivo:path}")
+def baixar_imagem_scheda(nome_arquivo: str):
+    caminho_arquivo = f"server/scheda/imagens/{nome_arquivo}"
+    
+    if os.path.exists(caminho_arquivo):
+        return FileResponse(path=caminho_arquivo)
+    else:
+        raise HTTPException(status_code=404, detail="Disegno non trovato.")
+####################################################################################################################
+
+
+# ROTA POST: Recebe o desenho técnico e salva na pasta do servidor
+@app.post("/scheda/upload/imagem/{codigo:path}")
+async def upload_imagem_scheda(codigo: str, file: UploadFile = File(...)):
+    try:
+        codigo_limpo = codigo.replace("/", "-").replace("\\", "-")
+        _, ext = os.path.splitext(file.filename)
+        
+        caminho_destino = f"server/scheda/imagens/{codigo_limpo}{ext}"
+        os.makedirs(os.path.dirname(caminho_destino), exist_ok=True)
+        
+        with open(caminho_destino, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        return {"status": "sucesso"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+####################################################################################################################
+
+
 # ROTA POST: Para SALVAR um novo histórico
 @app.post("/rapportini/")
 def salvar_historico(rap: RapportinoCreate, db: Session = Depends(get_db)):
@@ -124,8 +156,9 @@ def salvar_historico(rap: RapportinoCreate, db: Session = Depends(get_db)):
 # ROTA GET: Para LER o histórico de uma matriz específica
 @app.get("/rapportini/{matrice:path}")
 def ler_historicos(matrice: str, db: Session = Depends(get_db)):
-    # O resto do código continua igual...
-    registros = db.query(model_bd.RapportiniDB).filter(model_bd.RapportiniDB.matrice == matrice.upper()).all()
+    registros = db.query(model_bd.RapportiniDB).filter(
+                            model_bd.RapportiniDB.matrice == matrice.upper()).order_by(
+                                model_bd.RapportiniDB.data_ora.desc()).all()
     return registros
 ####################################################################################################################
 
