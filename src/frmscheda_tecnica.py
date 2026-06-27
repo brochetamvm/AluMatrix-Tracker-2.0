@@ -1,14 +1,18 @@
 import os
 import json
 import inspect
+import customtkinter as ctk
+import threading
+
 from enum import Enum
 from tkinter import messagebox, filedialog
-import customtkinter as ctk
 from PIL import Image
-
 from scheda_tecnica import TipoLega
+from url_api import API_URL
 
-JSON_INFO_SCHEDA_TECNICA = "json/info_scheda_tecnica.json"
+# Garante que o sistema ache a pasta src independentemente de onde o main.py foi executado
+DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
+JSON_INFO_SCHEDA_TECNICA = os.path.join(DIRETORIO_ATUAL, "json", "info_scheda_tecnica.json")
 
 class CartaoExpandivel(ctk.CTkFrame):
     def __init__(self, master, titulo, **kwargs):
@@ -44,7 +48,6 @@ class CartaoExpandivel(ctk.CTkFrame):
 class FormSchedaTecnica(ctk.CTkToplevel):
     def __init__(self, master, matrice, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
-        self.withdraw()
         self.cod_matrice = matrice
 
         self.banco_completo = {}
@@ -61,8 +64,34 @@ class FormSchedaTecnica(ctk.CTkToplevel):
         self.state("zoomed")
         self.transient(master)
 
-        # --- Topo ---
-        self.pnl_topo = ctk.CTkFrame(self, fg_color="transparent")
+        # Criacao da tela da barra de progresso
+        self.pnl_loading = ctk.CTkFrame(self, fg_color="transparent")
+        self.pnl_loading.pack(expand=True, fill="both")
+        self.lbl_loading = ctk.CTkLabel(self.pnl_loading, text="Caricamento dei dati...", font=("Consolas", 18))
+        self.lbl_loading.pack(pady=10)
+        
+        self.progress_bar = ctk.CTkProgressBar(self.pnl_loading, mode="indeterminate", width=500)
+        self.progress_bar.pack(pady=5)        
+        self.progress_bar.start()
+
+        # 200 milissegundos para desenhar o Loading na tela e só depois faz trabalho pesado.
+        self.after(200, self.carrega_tela) 
+
+    def carrega_tela(self):
+        # Disparamos uma thread para ler o ficheiro SEM bloquear a tela
+        threading.Thread(target=self._processo_carregamento_thread, daemon=True).start()    
+
+    def _processo_carregamento_thread(self):
+        # 1. Lê o JSON em background
+        self.carregar_dados_do_json()
+        
+        # 2. Volta para o Thread Principal para desenhar os componentes
+        self.after(0, self._finalizar_renderizacao)    
+
+    def _finalizar_renderizacao(self):
+        self.pnl_conteudo = ctk.CTkFrame(self, fg_color="transparent")
+
+        self.pnl_topo = ctk.CTkFrame(self.pnl_conteudo, fg_color="transparent")
         self.pnl_topo.pack(fill="x", padx=20, pady=(15, 5))
         self.lbl_titulo = ctk.CTkLabel(self.pnl_topo, text=f"Scheda Tecnica - Articolo: {self.cod_matrice}", font=("Consolas", 24, "bold"))
         self.lbl_titulo.pack(side="left")
@@ -81,27 +110,30 @@ class FormSchedaTecnica(ctk.CTkToplevel):
         self.btn_novo.pack(side="left", padx=(10, 2))
 
         # --- Body ---
-        self.scroll_principal = ctk.CTkScrollableFrame(self)
+        self.scroll_principal = ctk.CTkScrollableFrame(self.pnl_conteudo)
         self.scroll_principal.pack(fill="both", expand=True, padx=20, pady=10)
 
         # --- Footer ---
-        self.pnl_acoes = ctk.CTkFrame(self, fg_color="transparent")
+        self.pnl_acoes = ctk.CTkFrame(self.pnl_conteudo, fg_color="transparent")
         self.pnl_acoes.pack(fill="x", side="bottom", pady=(0, 70), padx=20)
         self.btn_salvar = ctk.CTkButton(self.pnl_acoes, text="Salva i dati", font=("Consolas", 16, "bold"), height=40, state="disabled", command=self.salvar_dados)
         self.btn_salvar.pack(side="right")
 
-        self.carregar_dados_do_json()
+        self.renderizar_formulario_recursivo()        
         self.sincronizar_navegacao_liga()
-        self.renderizar_formulario_recursivo()
-        
-        # CORREÇÃO DE ORDEM SÊNIOR: Calcula as dimensões físicas primeiro...
         self.update_idletasks()
-
-        # ...E depois renderiza os valores populando o botão de imagem
         self.atualizar_valores_tela()
 
-        self.deiconify()
+        # Finaliza
+        try:
+            self.progress_bar.stop()
+            self.pnl_loading.destroy()
+        except:
+            pass
+            
+        self.pnl_conteudo.pack(fill="both", expand=True)
         self.grab_set()
+
 
     def carregar_dados_do_json(self):
         self.banco_completo = {}
@@ -208,7 +240,7 @@ class FormSchedaTecnica(ctk.CTkToplevel):
             self.verificar_alteracoes()
 
     def renderizar_formulario_recursivo(self):
-        from src.scheda_tecnica import scheda_tecnica
+        from scheda_tecnica import scheda_tecnica
         
         # --- 1. GENERALE ---
         card_geral = CartaoExpandivel(self.scroll_principal, titulo="PRESSA")
@@ -249,6 +281,7 @@ class FormSchedaTecnica(ctk.CTkToplevel):
                         ultimo_widget.configure(state="disabled")
 
             self.inputs["principal"][nome] = ref
+            self.update()
 
         # --- 2. RESTANTE ---
         subclasses = inspect.getmembers(scheda_tecnica, inspect.isclass)
@@ -269,6 +302,7 @@ class FormSchedaTecnica(ctk.CTkToplevel):
             if nome == "self": continue
             ref, int_row, int_col = self._criar_widget_dinamico(frame_inputs, nome, param.annotation, None, int_row, int_col)
             self.inputs[escopo_pai][nome] = ref
+            self.update()
 
         subclasses = inspect.getmembers(classe, inspect.isclass)
         for n_sub, c_sub in subclasses:
@@ -311,7 +345,7 @@ class FormSchedaTecnica(ctk.CTkToplevel):
         return var, int_row, int_col
 
     def _obter_classe_por_escopo(self, escopo):
-        from src.scheda_tecnica import scheda_tecnica
+        from scheda_tecnica import scheda_tecnica
         if escopo == "principal": return scheda_tecnica
         classe = scheda_tecnica
         try:
@@ -365,31 +399,40 @@ class FormSchedaTecnica(ctk.CTkToplevel):
         self.modo_insercao = True; self.sincronizar_navegacao_liga(); self.atualizar_valores_tela()
 
     def salvar_dados(self):
-        dados_finais = {}
-        for escopo, campos in self.inputs.items():
-            dados_finais[escopo] = {}
-            classe = self._obter_classe_por_escopo(escopo)
-            sig = inspect.signature(classe.__init__) if classe else None
-            for campo, ref in campos.items():
-                val_str = self._obter_valor_widget(escopo, campo)
-                
-                if escopo == "principal" and campo == "matrice": val_str = self.cod_matrice
-                elif escopo == "principal" and campo == "lega": val_str = self.liga_selecionada
+        try:
+            dados_finais = {}
+            for escopo, campos in self.inputs.items():
+                dados_finais[escopo] = {}
+                classe = self._obter_classe_por_escopo(escopo)
+                sig = inspect.signature(classe.__init__) if classe else None
+                for campo, ref in campos.items():
+                    val_str = self._obter_valor_widget(escopo, campo)
+                    
+                    if escopo == "principal" and campo == "matrice": val_str = self.cod_matrice
+                    elif escopo == "principal" and campo == "lega": val_str = self.liga_selecionada
 
-                tipo = sig.parameters[campo].annotation if (sig and campo in sig.parameters) else str
-                if tipo == bool: val = True if val_str == "True" else False
-                elif tipo == int: val = int(val_str) if val_str else 0
-                elif tipo == float: val = float(val_str) if val_str else 0.0
-                else: val = val_str
-                dados_finais[escopo][campo] = val
+                    tipo = sig.parameters[campo].annotation if (sig and campo in sig.parameters) else str
+                    if tipo == bool: val = True if val_str == "True" else False
+                    elif tipo == int: val = int(val_str) if val_str else 0
+                    elif tipo == float: val = float(val_str) if val_str else 0.0
+                    else: val = val_str
+                    dados_finais[escopo][campo] = val
 
-        chave_final = f"{self.cod_matrice}|{self.liga_selecionada}"
-        self.banco_completo[chave_final] = dados_finais
-        with open(JSON_INFO_SCHEDA_TECNICA, "w", encoding="utf-8") as f:
-            json.dump(self.banco_completo, f, indent=2, ensure_ascii=False)
-        
-        messagebox.showinfo("Successo", "Scheda Técnica salvata!")
-        self.modo_insercao = False
-        self.carregar_dados_do_json()
-        self.sincronizar_navegacao_liga()
-        self.atualizar_valores_tela()
+            chave_final = f"{self.cod_matrice}|{self.liga_selecionada}"
+            self.banco_completo[chave_final] = dados_finais
+            
+            # GARANTIA SÊNIOR: Cria a pasta 'json' caso ela tenha sido apagada!
+            os.makedirs(os.path.dirname(JSON_INFO_SCHEDA_TECNICA), exist_ok=True)
+            
+            with open(JSON_INFO_SCHEDA_TECNICA, "w", encoding="utf-8") as f:
+                json.dump(self.banco_completo, f, indent=2, ensure_ascii=False)
+            
+            messagebox.showinfo("Successo", "Scheda Tecnica salvata con successo!", parent=self)
+            self.modo_insercao = False
+            self.carregar_dados_do_json()
+            self.sincronizar_navegacao_liga()
+            self.atualizar_valores_tela()
+            
+        except Exception as e:
+            # Se der qualquer erro no Windows, a tela vermelha avisa!
+            messagebox.showerror("Errore Critico", f"Non è stato possibile salvare il file JSON:\n\n[{e}]", parent=self)

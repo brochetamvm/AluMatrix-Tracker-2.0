@@ -1,9 +1,12 @@
 import uvicorn
+import os
+
 from datetime import datetime
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from server.model_db import RapportinoCreate, RapportinoUpdate
+from fastapi.responses import FileResponse
 
 # CONFIGURAÇÃO DO BANCO DE DADOS
 SQLALCHEMY_DATABASE_URL = "sqlite:///./banco_rex.db"
@@ -29,9 +32,13 @@ def get_db():
         yield db
     finally:
         db.close()
+####################################################################################################################
 
-# ROTAS DA API (As "Portas")
+
+# Rotas da api (as "portas")
 app = FastAPI(title="Servidor AluMatrix")
+####################################################################################################################
+
 
 # ROTA POST: Para SALVAR um novo histórico
 @app.post("/rapportini/")
@@ -45,6 +52,8 @@ def salvar_historico(rap: RapportinoCreate, db: Session = Depends(get_db)):
     db.add(novo_registro)
     db.commit()
     return {"mensagem": "Registered in the SQL Database successfully!"}
+####################################################################################################################
+
 
 # ROTA GET: Para LER o histórico de uma matriz específica
 @app.get("/rapportini/{matrice:path}")
@@ -52,6 +61,8 @@ def ler_historicos(matrice: str, db: Session = Depends(get_db)):
     # O resto do código continua igual...
     registros = db.query(AluMatrixDB).filter(AluMatrixDB.matrice == matrice.upper()).all()
     return registros
+####################################################################################################################
+
 
 # ROTA PUT: Para MODIFICAR um histórico existente (Equivalente ao Edit + Post)
 @app.put("/rapportini/{id}")
@@ -70,6 +81,7 @@ def atualizar_historico(id: int, rap: RapportinoUpdate, db: Session = Depends(ge
     # Salva definitivamente no banco (Commit)
     db.commit()
     return {"message": f"Record ID {id} updated successfully!"}
+####################################################################################################################
 
 
 # ROTA DELETE: Para APAGAR um histórico existente (Equivalente ao Delete)
@@ -85,6 +97,35 @@ def apagar_historico(id: int, db: Session = Depends(get_db)):
     db.delete(registro)
     db.commit()
     return {"message": f"Record ID {id} successfully deleted!"}
+####################################################################################################################
+
+# ROTA GET: Arquivos pdf 
+@app.get("/arquivos/pdf/{codigo}")
+def baixar_pdf(codigo: str):
+    # Monta o caminho apontando para a nova pasta no servidor
+    caminho_arquivo = f"server/arquivos/pdf/{codigo}.pdf"
+    
+    # Verifica se o arquivo físico existe no disco do servidor
+    if os.path.exists(caminho_arquivo):
+        # Envia o arquivo como um anexo pela rede
+        return FileResponse(path=caminho_arquivo, filename=f"{codigo}.pdf", media_type='application/pdf')
+    else:
+        # Devolve um erro 404 limpo para o CustomTkinter ativar o Plano B (Offline)
+        raise HTTPException(status_code=404, detail="PDF não encontrado no servidor.")
+####################################################################################################################
+
+
+# ROTA GET: Fotos incestatura 
+@app.get("/arquivos/fotos/{codigo}")
+def baixar_foto(codigo: str):
+    # Monta o caminho da foto
+    caminho_arquivo = f"server/arquivos/fotos/{codigo}.jpg"
+    
+    if os.path.exists(caminho_arquivo):
+        return FileResponse(path=caminho_arquivo, filename=f"{codigo}.jpg", media_type='image/jpeg')
+    else:
+        raise HTTPException(status_code=404, detail="Foto não encontrada no servidor.")
+####################################################################################################################
 
 
 if __name__ == "__main__":

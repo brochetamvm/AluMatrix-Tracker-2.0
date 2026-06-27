@@ -15,7 +15,7 @@
 import os
 import customtkinter as ctk
 
-from util import format_form, carrega_imagem, exec_cerca_PDF, somente_maiusculas, exec_scheda_tec, exec_rapp_elettr, exec_cerca_foto_incestatura, ler_json_path
+from util import format_form, carrega_imagem, exec_cerca_PDF, somente_maiusculas, exec_scheda_tec, exec_rapp_elettr, exec_cerca_foto_incestatura, verifica_conexao_server
 from frmscheda_tecnica import FormSchedaTecnica
 from frmrapp_elettr import FormRappElettr
 
@@ -56,7 +56,7 @@ edit_matrice.bind("<Return>", key_press_campo)
 somente_maiusculas(edit_matrice)
 
 # para teste
-edit_matrice.insert(0, "3DI12345/1")
+edit_matrice.insert(0, "3DI54321/1")
 
 # label separador
 lbl_sep = ctk.CTkLabel(pnl_principal, text="", font=("", 1))
@@ -67,11 +67,14 @@ pnl_button = ctk.CTkFrame(pnl_principal)
 pnl_button.pack()
 
 # label rodape cria
-lbl_rodape = ctk.CTkLabel(frmPrincipal, text="", font=("Consolas", 13, "bold", "italic"), anchor="w")
+lbl_rodape = ctk.CTkLabel(frmPrincipal, text="  Verificando connessione...", font=("Consolas", 13, "bold", "italic"), anchor="w")
 lbl_rodape.pack(side="bottom", fill="x")
+# Esta é a função "telefone" que a Thread vai chamar quando terminar de testar a rede
+def atualizar_label_status(caminho, status_texto):
+    lbl_rodape.configure(text="  " + status_texto)
+# Função principal que dispara a verificação passando o "telefone"
 def atualiza_status(tipo):
-    status1, status2 = ler_json_path(tipo)
-    lbl_rodape.configure(text="  "+status2)
+    verifica_conexao_server(tipo, atualizar_label_status)
 atualiza_status("PDF")
 
 # Botao de procurar PDF/Desenho Tecnico   
