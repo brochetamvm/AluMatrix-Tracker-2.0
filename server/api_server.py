@@ -23,64 +23,6 @@ def ping():
     return True
 ####################################################################################################################
 
-# ROTA POST: Para SALVAR um novo histórico
-@app.post("/rapportini/")
-def salvar_historico(rap: RapportinoCreate, db: Session = Depends(get_db)):
-    novo_registro = model_bd.RapportiniDB(
-        matrice=rap.matrice.upper(),
-        turno=rap.turno,
-        storico=rap.storico,
-        data_ora=datetime.now().strftime("%Y-%m-%d %H:%M:%S") # A data é gerada pelo servidor!
-    )
-    db.add(novo_registro)
-    db.commit()
-    return {"mensagem": "Registered in the SQL Database successfully!"}
-####################################################################################################################
-
-
-# ROTA GET: Para LER o histórico de uma matriz específica
-@app.get("/rapportini/{matrice:path}")
-def ler_historicos(matrice: str, db: Session = Depends(get_db)):
-    # O resto do código continua igual...
-    registros = db.query(model_bd.RapportiniDB).filter(model_bd.RapportiniDB.matrice == matrice.upper()).all()
-    return registros
-####################################################################################################################
-
-
-# ROTA PUT: Para MODIFICAR um histórico existente (Equivalente ao Edit + Post)
-@app.put("/rapportini/{id}")
-def atualizar_historico(id: int, rap: RapportinoUpdate, db: Session = Depends(get_db)):
-    # Faz um "SELECT * FROM rapportini WHERE id = :id" para achar o registro
-    registro = db.query(model_bd.RapportiniDB).filter(model_bd.RapportiniDB.id == id).first()
-    
-    # Se o ID não existir, avisa o cliente
-    if not registro:
-        return {"Error": "Record not found in the database."}
-    
-    # Atualiza os campos com os novos dados recebidos
-    registro.storico = rap.storico
-    registro.data_ora = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # Atualiza a estampa de tempo
-    
-    # Salva definitivamente no banco (Commit)
-    db.commit()
-    return {"message": f"Record ID {id} updated successfully!"}
-####################################################################################################################
-
-
-# ROTA DELETE: Para APAGAR um histórico existente (Equivalente ao Delete)
-@app.delete("/rapportini/{id}")
-def apagar_historico(id: int, db: Session = Depends(get_db)):
-    # Procura o registro pelo ID
-    registro = db.query(model_bd.RapportiniDB).filter(model_bd.RapportiniDB.id == id).first()
-    
-    if not registro:
-        return {"error": "Record not found in the database."}
-    
-    # Manda o banco deletar a linha
-    db.delete(registro)
-    db.commit()
-    return {"message": f"Record ID {id} successfully deleted!"}
-####################################################################################################################
 
 # ROTA GET: Arquivos pdf 
 @app.get("/arquivos/pdf/{codigo}")
@@ -164,6 +106,64 @@ def salvar_scheda(dados: dict, db: Session = Depends(get_db)):
 ####################################################################################################################
 
 
+# ROTA POST: Para SALVAR um novo histórico
+@app.post("/rapportini/")
+def salvar_historico(rap: RapportinoCreate, db: Session = Depends(get_db)):
+    novo_registro = model_bd.RapportiniDB(
+        matrice=rap.matrice.upper(),
+        turno=rap.turno,
+        storico=rap.storico,
+        data_ora=datetime.now().strftime("%Y-%m-%d %H:%M:%S") # A data é gerada pelo servidor!
+    )
+    db.add(novo_registro)
+    db.commit()
+    return {"mensagem": "Registered in the SQL Database successfully!"}
+####################################################################################################################
+
+
+# ROTA GET: Para LER o histórico de uma matriz específica
+@app.get("/rapportini/{matrice:path}")
+def ler_historicos(matrice: str, db: Session = Depends(get_db)):
+    # O resto do código continua igual...
+    registros = db.query(model_bd.RapportiniDB).filter(model_bd.RapportiniDB.matrice == matrice.upper()).all()
+    return registros
+####################################################################################################################
+
+
+# ROTA PUT: Para MODIFICAR um histórico existente (Equivalente ao Edit + Post)
+@app.put("/rapportini/{id}")
+def atualizar_historico(id: int, rap: RapportinoUpdate, db: Session = Depends(get_db)):
+    # Faz um "SELECT * FROM rapportini WHERE id = :id" para achar o registro
+    registro = db.query(model_bd.RapportiniDB).filter(model_bd.RapportiniDB.id == id).first()
+    
+    # Se o ID não existir, avisa o cliente
+    if not registro:
+        return {"Error": "Record not found in the database."}
+    
+    # Atualiza os campos com os novos dados recebidos
+    registro.storico = rap.storico
+    registro.data_ora = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # Atualiza a estampa de tempo
+    
+    # Salva definitivamente no banco (Commit)
+    db.commit()
+    return {"message": f"Record ID {id} updated successfully!"}
+####################################################################################################################
+
+
+# ROTA DELETE: Para APAGAR um histórico existente (Equivalente ao Delete)
+@app.delete("/rapportini/{id}")
+def apagar_historico(id: int, db: Session = Depends(get_db)):
+    # Procura o registro pelo ID
+    registro = db.query(model_bd.RapportiniDB).filter(model_bd.RapportiniDB.id == id).first()
+    
+    if not registro:
+        return {"error": "Record not found in the database."}
+    
+    # Manda o banco deletar a linha
+    db.delete(registro)
+    db.commit()
+    return {"message": f"Record ID {id} successfully deleted!"}
+####################################################################################################################
 
 
 if __name__ == "__main__":
