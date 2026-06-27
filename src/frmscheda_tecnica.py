@@ -3,6 +3,7 @@ import json
 import inspect
 import customtkinter as ctk
 import threading
+import requests
 
 from enum import Enum
 from tkinter import messagebox, filedialog
@@ -10,10 +11,7 @@ from PIL import Image
 from scheda_tecnica import TipoLega
 from url_api import API_URL
 
-# Garante que o sistema ache a pasta src independentemente de onde o main.py foi executado
-DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
-JSON_INFO_SCHEDA_TECNICA = os.path.join(DIRETORIO_ATUAL, "json", "info_scheda_tecnica.json")
-
+# CLASSE DE COMPONENTE DE TELA - PAINEIS QUE ABREM E FECHANDO QUANDO CLICA
 class CartaoExpandivel(ctk.CTkFrame):
     def __init__(self, master, titulo, **kwargs):
         super().__init__(master, **kwargs)
@@ -44,10 +42,15 @@ class CartaoExpandivel(ctk.CTkFrame):
             self.frame_conteudo.pack(fill="x", padx=15, pady=15, after=self.frame_cabecalho)
             self.lbl_seta.configure(text="▲")
             self.aberto = True
+#########################################################################################################################            
 
+
+# CLASSE FICHA TECNICA - TELA
 class FormSchedaTecnica(ctk.CTkToplevel):
     def __init__(self, master, matrice, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
+
+        # CONFIG TELA
         self.cod_matrice = matrice
 
         self.banco_completo = {}
@@ -63,8 +66,9 @@ class FormSchedaTecnica(ctk.CTkToplevel):
         self.title(f"Scheda Tecnica - Articolo: {self.cod_matrice}")
         self.state("zoomed")
         self.transient(master)
+        ##############################################################
 
-        # Criacao da tela da barra de progresso
+        # CRIACAO DA TELA DA BARRA DE PROGRESSO
         self.pnl_loading = ctk.CTkFrame(self, fg_color="transparent")
         self.pnl_loading.pack(expand=True, fill="both")
         self.lbl_loading = ctk.CTkLabel(self.pnl_loading, text="Caricamento dei dati...", font=("Consolas", 18))
@@ -76,21 +80,30 @@ class FormSchedaTecnica(ctk.CTkToplevel):
 
         # 200 milissegundos para desenhar o Loading na tela e só depois faz trabalho pesado.
         self.after(200, self.carrega_tela) 
+    #########################################################################################################################
 
+    
+    # INICIA THREAD PARA O CARREGAMENTO DA TELA
     def carrega_tela(self):
         # Disparamos uma thread para ler o ficheiro SEM bloquear a tela
         threading.Thread(target=self._processo_carregamento_thread, daemon=True).start()    
+    #########################################################################################################################
 
+
+    # FAZ O CARREGAMENTO DO JSON EM BACKGROUND
     def _processo_carregamento_thread(self):
-        # 1. Lê o JSON em background
         self.carregar_dados_do_json()
         
         # 2. Volta para o Thread Principal para desenhar os componentes
         self.after(0, self._finalizar_renderizacao)    
+    #########################################################################################################################
 
+
+    # TERMINA DE MONTAR A TELA
     def _finalizar_renderizacao(self):
         self.pnl_conteudo = ctk.CTkFrame(self, fg_color="transparent")
 
+        # cabecalho
         self.pnl_topo = ctk.CTkFrame(self.pnl_conteudo, fg_color="transparent")
         self.pnl_topo.pack(fill="x", padx=20, pady=(15, 5))
         self.lbl_titulo = ctk.CTkLabel(self.pnl_topo, text=f"Scheda Tecnica - Articolo: {self.cod_matrice}", font=("Consolas", 24, "bold"))
@@ -106,25 +119,25 @@ class FormSchedaTecnica(ctk.CTkToplevel):
         self.lbl_contador.pack(side="left", padx=3)
         self.btn_prox = ctk.CTkButton(self.pnl_navegacao, text="▶", width=35, command=self.proximo_registro)
         self.btn_prox.pack(side="left", padx=2)
-        self.btn_novo = ctk.CTkButton(self.pnl_navegacao, text="＋", width=35, fg_color="#2b7337", command=self.preparar_nova_liga)
+        self.btn_novo = ctk.CTkButton(self.pnl_navegacao, text="＋", width=35, fg_color="#2b7337", command=self.preparar_nova_lega)
         self.btn_novo.pack(side="left", padx=(10, 2))
 
-        # --- Body ---
+        # corpo
         self.scroll_principal = ctk.CTkScrollableFrame(self.pnl_conteudo)
         self.scroll_principal.pack(fill="both", expand=True, padx=20, pady=10)
 
-        # --- Footer ---
+        # rodape
         self.pnl_acoes = ctk.CTkFrame(self.pnl_conteudo, fg_color="transparent")
         self.pnl_acoes.pack(fill="x", side="bottom", pady=(0, 70), padx=20)
         self.btn_salvar = ctk.CTkButton(self.pnl_acoes, text="Salva i dati", font=("Consolas", 16, "bold"), height=40, state="disabled", command=self.salvar_dados)
         self.btn_salvar.pack(side="right")
 
         self.renderizar_formulario_recursivo()        
-        self.sincronizar_navegacao_liga()
+        self.sincronizar_navegacao_lega()
         self.update_idletasks()
         self.atualizar_valores_tela()
 
-        # Finaliza
+        # destroi tela de barra de progresso
         try:
             self.progress_bar.stop()
             self.pnl_loading.destroy()
@@ -133,16 +146,28 @@ class FormSchedaTecnica(ctk.CTkToplevel):
             
         self.pnl_conteudo.pack(fill="both", expand=True)
         self.grab_set()
+    #########################################################################################################################
 
 
+    # FAZ REQUISICAO AO SERVER DE TODOS OS DADOS DAS FICHAS
     def carregar_dados_do_json(self):
-        self.banco_completo = {}
-        if os.path.exists(JSON_INFO_SCHEDA_TECNICA):
-            with open(JSON_INFO_SCHEDA_TECNICA, "r", encoding="utf-8") as f:
-                self.banco_completo = json.load(f)
+        try:
+            # Tenta buscar do servidor
+            resposta = requests.get(f"{API_URL}/scheda", timeout=5)
+            if resposta.status_code == 200:
+                self.banco_completo = resposta.json()
+            else:
+                raise Exception("Erro no servidor")
+        except:
+            #messagebox.showwarning("Modo Offline", "Não foi possível conectar ao servidor.")
+            self.banco_completo = {}
+            
         self.ligas_cadastradas = [c.split("|")[1] for c in self.banco_completo.keys() if c.startswith(f"{self.cod_matrice}|")]
+    #########################################################################################################################
 
-    def sincronizar_navegacao_liga(self):
+
+    #
+    def sincronizar_navegacao_lega(self):
         if not self.ligas_cadastradas and not self.modo_insercao: self.modo_insercao = True
         if self.modo_insercao:
             ligas_livres = [l.value for l in TipoLega if l.value not in self.ligas_cadastradas]
@@ -160,13 +185,19 @@ class FormSchedaTecnica(ctk.CTkToplevel):
                 self.btn_ant.configure(state="normal"); self.btn_prox.configure(state="normal")
                 self.lbl_contador.configure(text=f"{self.indice_liga_atual+1}/{len(self.ligas_cadastradas)}")
                 self.dados_originais = self.banco_completo.get(f"{self.cod_matrice}|{self.liga_selecionada}", {})
+    #########################################################################################################################                
 
+
+    #
     def _obter_valor_widget(self, escopo, campo):
         ref = self.inputs[escopo][campo]
         if isinstance(ref, ctk.StringVar): return ref.get()
         if isinstance(ref, ctk.CTkTextbox): return ref.get("1.0", "end-1c").strip()
         return ""
+    #########################################################################################################################
 
+
+    #
     def atualizar_valores_tela(self):
         self.carregando_dados = True
         
@@ -193,7 +224,10 @@ class FormSchedaTecnica(ctk.CTkToplevel):
 
         self.btn_salvar.configure(state="normal" if self.modo_insercao else "disabled")
         self.carregando_dados = False
+    #########################################################################################################################    
 
+
+    #
     def _atualizar_preview_imagem(self, caminho):
         try:
             if not caminho or len(caminho.strip()) < 4:
@@ -225,12 +259,18 @@ class FormSchedaTecnica(ctk.CTkToplevel):
         except Exception as e:
             self.btn_imagem.configure(image=None, text=f"ERRORE FORMATO IMMAGINE:\n\n{str(e)}", fg_color="transparent", border_width=1)
             self.btn_imagem.image = None
+    #########################################################################################################################            
 
+
+    #
     def _view_layout_refresh(self):
         # Callback auxiliar para reajustar o canvas caso a janela mude de estado
         path_atual = self.inputs["principal"]["disegno_tec"].get()
         self._atualizar_preview_imagem(path_atual)
+    #########################################################################################################################    
 
+
+    #
     def _selecionar_imagem(self):
         path = filedialog.askopenfilename(filetypes=[("Immagini standard", "*.png *.jpg *.jpeg *.bmp"), ("Tutti i file", "*.*")])
         if path:
@@ -238,11 +278,14 @@ class FormSchedaTecnica(ctk.CTkToplevel):
             self.inputs["principal"]["disegno_tec"].set(path_limpo)
             self._atualizar_preview_imagem(path_limpo)
             self.verificar_alteracoes()
+    #########################################################################################################################                        
 
+
+    #
     def renderizar_formulario_recursivo(self):
         from scheda_tecnica import scheda_tecnica
         
-        # --- 1. GENERALE ---
+        # geral
         card_geral = CartaoExpandivel(self.scroll_principal, titulo="PRESSA")
         card_geral.pack(fill="x", padx=10, pady=5)
         card_geral.alternar_expansao()
@@ -283,14 +326,17 @@ class FormSchedaTecnica(ctk.CTkToplevel):
             self.inputs["principal"][nome] = ref
             self.update()
 
-        # --- 2. RESTANTE ---
+        # o resto
         subclasses = inspect.getmembers(scheda_tecnica, inspect.isclass)
         for nome_sub, classe_sub in subclasses:
             if not classe_sub.__qualname__.startswith("scheda_tecnica."): continue
             card = CartaoExpandivel(self.scroll_principal, titulo=nome_sub.replace("_", " ").upper())
             card.pack(fill="x", padx=10, pady=5)
             self._processar_nivel_classe(classe_sub, card.frame_conteudo, escopo_pai=nome_sub)
+    #########################################################################################################################
 
+
+    #
     def _processar_nivel_classe(self, classe, container, escopo_pai):
         self.inputs[escopo_pai] = {}
         frame_inputs = ctk.CTkFrame(container, fg_color="transparent")
@@ -313,7 +359,10 @@ class FormSchedaTecnica(ctk.CTkToplevel):
             grid_sub = ctk.CTkFrame(card_sub, fg_color="transparent")
             grid_sub.pack(fill="both", expand=True, padx=5, pady=5)
             self._processar_nivel_classe(c_sub, grid_sub, f"{escopo_pai}.{n_sub}")
+    #########################################################################################################################            
 
+
+    #
     def _criar_widget_dinamico(self, frame, nome_param, tipo_esperado, valor_json, int_row, int_col):
         if nome_param == "oss" or nome_param.startswith("oss_"):
             if int_col == 2: int_row += 1; int_col = 0
@@ -343,7 +392,10 @@ class FormSchedaTecnica(ctk.CTkToplevel):
         int_col += 2
         if int_col >= 4: int_col = 0; int_row += 1
         return var, int_row, int_col
+    #########################################################################################################################
 
+
+    #
     def _obter_classe_por_escopo(self, escopo):
         from scheda_tecnica import scheda_tecnica
         if escopo == "principal": return scheda_tecnica
@@ -352,7 +404,10 @@ class FormSchedaTecnica(ctk.CTkToplevel):
             for parte in escopo.split('.'): classe = getattr(classe, parte)
             return classe
         except: return None
+    #########################################################################################################################
 
+
+    #
     def verificar_alteracoes(self, *args):
         if self.carregando_dados: return
         if self.modo_insercao:
@@ -380,24 +435,39 @@ class FormSchedaTecnica(ctk.CTkToplevel):
         self.btn_ant.configure(state="disabled" if alterado else "normal")
         self.btn_prox.configure(state="disabled" if alterado else "normal")
         self.btn_novo.configure(state="disabled" if alterado else "normal")
+    #########################################################################################################################
 
+
+    #
     def registro_anterior(self):
         self.indice_liga_atual = (self.indice_liga_atual - 1) % len(self.ligas_cadastradas)
-        self.sincronizar_navegacao_liga(); self.atualizar_valores_tela()
+        self.sincronizar_navegacao_lega(); self.atualizar_valores_tela()
+    #########################################################################################################################        
 
+
+    #
     def proximo_registro(self):
         self.indice_liga_atual = (self.indice_liga_atual + 1) % len(self.ligas_cadastradas)
-        self.sincronizar_navegacao_liga(); self.atualizar_valores_tela()
+        self.sincronizar_navegacao_lega(); self.atualizar_valores_tela()
+    #########################################################################################################################
 
+
+    #
     def _mudanca_manual_combo(self, escolha):
         if self.modo_insercao: self.liga_selecionada = escolha; self.atualizar_valores_tela()
         elif escolha in self.ligas_cadastradas:
             self.indice_liga_atual = self.ligas_cadastradas.index(escolha)
-            self.sincronizar_navegacao_liga(); self.atualizar_valores_tela()
+            self.sincronizar_navegacao_lega(); self.atualizar_valores_tela()
+    #########################################################################################################################
 
-    def preparar_nova_liga(self):
-        self.modo_insercao = True; self.sincronizar_navegacao_liga(); self.atualizar_valores_tela()
 
+    # 
+    def preparar_nova_lega(self):
+        self.modo_insercao = True; self.sincronizar_navegacao_lega(); self.atualizar_valores_tela()
+    #########################################################################################################################
+
+
+    # ACAO DO BOTAO SALVAR DADOS 
     def salvar_dados(self):
         try:
             dados_finais = {}
@@ -417,22 +487,25 @@ class FormSchedaTecnica(ctk.CTkToplevel):
                     elif tipo == float: val = float(val_str) if val_str else 0.0
                     else: val = val_str
                     dados_finais[escopo][campo] = val
-
+            
+            # Atualiza o banco local antes de enviar
             chave_final = f"{self.cod_matrice}|{self.liga_selecionada}"
             self.banco_completo[chave_final] = dados_finais
             
-            # GARANTIA SÊNIOR: Cria a pasta 'json' caso ela tenha sido apagada!
-            os.makedirs(os.path.dirname(JSON_INFO_SCHEDA_TECNICA), exist_ok=True)
+            # ENVIO PARA A API
+            resposta = requests.post(f"{API_URL}/scheda/salvar", json=self.banco_completo, timeout=10)
             
-            with open(JSON_INFO_SCHEDA_TECNICA, "w", encoding="utf-8") as f:
-                json.dump(self.banco_completo, f, indent=2, ensure_ascii=False)
+            if resposta.status_code == 200:
+                messagebox.showinfo("Sucesso", "Dados salvos no servidor!")
+                self.modo_insercao = False
+            else:
+                raise Exception(f"Servidor retornou erro: {resposta.status_code}")
             
-            messagebox.showinfo("Successo", "Scheda Tecnica salvata con successo!", parent=self)
-            self.modo_insercao = False
+            # Recarrega a tela para refletir as mudanças
             self.carregar_dados_do_json()
-            self.sincronizar_navegacao_liga()
+            self.sincronizar_navegacao_lega()
             self.atualizar_valores_tela()
             
         except Exception as e:
-            # Se der qualquer erro no Windows, a tela vermelha avisa!
-            messagebox.showerror("Errore Critico", f"Non è stato possibile salvare il file JSON:\n\n[{e}]", parent=self)
+            messagebox.showerror("Erro Crítico", f"Falha ao salvar no servidor:\n\n{e}")        
+    #########################################################################################################################

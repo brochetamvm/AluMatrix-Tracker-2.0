@@ -1,49 +1,32 @@
 import uvicorn
 import os
 
+from server import model_bd
 from datetime import datetime
 from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
-from server.model_db import RapportinoCreate, RapportinoUpdate
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, Session
+from server.model_db_valid import RapportinoCreate, RapportinoUpdate
 from fastapi.responses import FileResponse
-
-# CONFIGURAÇÃO DO BANCO DE DADOS
-SQLALCHEMY_DATABASE_URL = "sqlite:///./banco_rex.db"
-
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-class AluMatrixDB(Base):
-    __tablename__ = "rapportini"
-    id = Column(Integer, primary_key=True, index=True)
-    matrice = Column(String, index=True)
-    turno = Column(String)
-    storico = Column(String)
-    data_ora = Column(String)
-
-Base.metadata.create_all(bind=engine)
-
-# Função para abrir e fechar a conexão com o banco com segurança
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-####################################################################################################################
+from server.config import DATABASE_URL
+from server.database import get_db, engine
 
 
 # Rotas da api (as "portas")
 app = FastAPI(title="Servidor AluMatrix")
+model_bd.Base.metadata.create_all(bind=engine)
 ####################################################################################################################
 
+# ROTA GET: Se servidor esta de pe
+@app.get("/ping")
+def ping():
+    return True
+####################################################################################################################
 
 # ROTA POST: Para SALVAR um novo histórico
 @app.post("/rapportini/")
 def salvar_historico(rap: RapportinoCreate, db: Session = Depends(get_db)):
-    novo_registro = AluMatrixDB(
+    novo_registro = model_bd.RapportiniDB(
         matrice=rap.matrice.upper(),
         turno=rap.turno,
         storico=rap.storico,
@@ -59,7 +42,7 @@ def salvar_historico(rap: RapportinoCreate, db: Session = Depends(get_db)):
 @app.get("/rapportini/{matrice:path}")
 def ler_historicos(matrice: str, db: Session = Depends(get_db)):
     # O resto do código continua igual...
-    registros = db.query(AluMatrixDB).filter(AluMatrixDB.matrice == matrice.upper()).all()
+    registros = db.query(model_bd.RapportiniDB).filter(model_bd.RapportiniDB.matrice == matrice.upper()).all()
     return registros
 ####################################################################################################################
 
@@ -68,7 +51,7 @@ def ler_historicos(matrice: str, db: Session = Depends(get_db)):
 @app.put("/rapportini/{id}")
 def atualizar_historico(id: int, rap: RapportinoUpdate, db: Session = Depends(get_db)):
     # Faz um "SELECT * FROM rapportini WHERE id = :id" para achar o registro
-    registro = db.query(AluMatrixDB).filter(AluMatrixDB.id == id).first()
+    registro = db.query(model_bd.RapportiniDB).filter(model_bd.RapportiniDB.id == id).first()
     
     # Se o ID não existir, avisa o cliente
     if not registro:
@@ -88,7 +71,7 @@ def atualizar_historico(id: int, rap: RapportinoUpdate, db: Session = Depends(ge
 @app.delete("/rapportini/{id}")
 def apagar_historico(id: int, db: Session = Depends(get_db)):
     # Procura o registro pelo ID
-    registro = db.query(AluMatrixDB).filter(AluMatrixDB.id == id).first()
+    registro = db.query(model_bd.RapportiniDB).filter(model_bd.RapportiniDB.id == id).first()
     
     if not registro:
         return {"error": "Record not found in the database."}
@@ -126,6 +109,61 @@ def baixar_foto(codigo: str):
     else:
         raise HTTPException(status_code=404, detail="Foto não encontrada no servidor.")
 ####################################################################################################################
+
+
+# ROTA GET: Busca tudo no banco a ficha tecnica e transforma no formato JSON que seu frontend espera
+@app.get("/scheda")
+def get_todas_schedas(db: Session = Depends(get_db)):
+    # Busca todos os registros da tabela
+    registros = db.query(model_bd.SchedaTecnicaDB).all()
+    
+    # Reconstitui o dicionário "matrice|lega": {dados} que seu cliente Tkinter usa
+    banco_formatado = {}
+    for r in registros:
+        chave = f"{r.matrice}|{r.lega}"
+        banco_formatado[chave] = r.dados
+        
+    return banco_formatado
+####################################################################################################################
+
+
+# ROTA POST: Salva ou Atualiza no banco a ficha tecnica
+@app.post("/scheda/salvar")
+def salvar_scheda(dados: dict, db: Session = Depends(get_db)):
+    try:
+        # 'dados' é o dicionário completo enviado pelo Tkinter
+        for chave, valores in dados.items():
+            # A chave é "3DI12345/1|LEGA 6060"
+            matrice, lega = chave.split("|")
+            
+            # Verifica se já existe no banco (o seu "Locate" do Delphi)
+            registro = db.query(model_bd.SchedaTecnicaDB).filter(
+                model_bd.SchedaTecnicaDB.matrice == matrice,
+                model_bd.SchedaTecnicaDB.lega == lega
+            ).first()
+            
+            if registro:
+                # Se existe, damos um Update
+                registro.dados = valores
+            else:
+                # Se não, criamos um novo (Insert)
+                novo_registro = model_bd.SchedaTecnicaDB(
+                    matrice=matrice,
+                    lega=lega,
+                    dados=valores
+                )
+                db.add(novo_registro)
+        
+        # Só comitamos uma vez no final, como se fosse um ApplyUpdates em lote
+        db.commit()
+        return {"status": "sucesso"}
+    
+    except Exception as e:
+        db.rollback() # Segurança: Se der erro, desfaz tudo
+        raise HTTPException(status_code=500, detail=str(e))
+####################################################################################################################
+
+
 
 
 if __name__ == "__main__":

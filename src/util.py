@@ -40,6 +40,21 @@ def carrega_imagem(path_img, largura, altura):
 ####################################################################################################################
 
 
+# VERIFICA SE SERVIDOR ESTA ONLINE
+def server_on_line():
+    try:
+        resp = requests.get(f"{API_URL}/ping", timeout=2)
+        if resp.status_code == 200:
+            return True      
+        else:
+            messagebox.showwarning("Atenzione!", f"Falha na requisicao ao servidor! [{resp}]")    
+    except requests.exceptions.RequestException:     
+        messagebox.showwarning("Atenzione!", f"Server offline!")         
+
+    return False            
+####################################################################################################################
+
+
 # CONVERTER MINUSCALAS EM LETRAS MAIUSCULAS
 def somente_maiusculas(campo):
     def converter(event):
@@ -55,19 +70,24 @@ def somente_maiusculas(campo):
 
 # EXECUTA SCHEDA TECNICA
 def exec_scheda_tec(cod_matrice):
-    if valida_cod_matrice(cod_matrice, True) == True:
-        return True  # Retorna True se passou na validação da engenharia
+    if server_on_line():
+        if valida_cod_matrice(cod_matrice, True) == True:
+            return True 
+                     
     return False  # Retorna False se falhou
 ####################################################################################################################
 
 
 # EXECUTA RAPPORTINO ELETTRONICO
 def exec_rapp_elettr(cod_matrice):
-    if valida_cod_matrice(cod_matrice, True) == True:
-        return True  # Retorna True se passou na validação da engenharia
+    if server_on_line():
+        if valida_cod_matrice(cod_matrice, True) == True:
+            return True 
+           
     return False  # Retorna False se falhou    
 ####################################################################################################################
     
+
 # VALIDA CAMPO CODIGO MATRICE
 def valida_cod_matrice(valor_campo, scheda_tecnica):
     validacao = True

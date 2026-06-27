@@ -7,22 +7,21 @@ class FormModific_Rapp_Elettr(ctk.CTkToplevel):
     def __init__(self, master, matrice, on_save, registro_edicao=None, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
 
-        # Configurações da Janela
+        # CONFIGURAÇÕES DA JANELA
         self.cod_matrice = matrice
         self.on_save = on_save
         self.registro_edicao = registro_edicao # Guarda se é uma edição
-
         self.title(f"Aggiunge nuovo storico - Articolo: {self.cod_matrice}")
-        format_form(710, 440, self)
-        #self.resizable(False, False)        
+        format_form(710, 440, self)     
 
         # Comportamento de foco e prioridade na tela
         self.transient(master)
         self.lift()
         self.focus_force()
         self.grab_set()
+        #########################################################################################################################
 
-        # Panel principal que contem tudo
+        # PANEL PRINCIPAL QUE CONTEM TUDO
         self.pnl_principal = ctk.CTkFrame(self)
         self.pnl_principal.pack(fill="both", expand=True, pady=20, padx=20)
 
@@ -30,8 +29,9 @@ class FormModific_Rapp_Elettr(ctk.CTkToplevel):
         self.pnl_principal.grid_rowconfigure(1, weight=2)
         self.pnl_principal.grid_rowconfigure(2, weight=1)
         self.pnl_principal.grid_columnconfigure(0, weight=1)
+        #########################################################################################################################
 
-        # Panel turnos
+        # PANEL TURNOS
         self.pnl_turno = ctk.CTkFrame(self.pnl_principal, height=10)
         self.pnl_turno.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="nsew")  
         
@@ -40,7 +40,9 @@ class FormModific_Rapp_Elettr(ctk.CTkToplevel):
         self.pnl_turno.grid_columnconfigure(2, weight=1)
 
         self.title("Modificare storico" if registro_edicao else f"Aggiunge novo storico - Articolo: {self.cod_matrice}")
+        #########################################################################################################################
 
+        # RADIOBOX - OPCAOES DE TURNO 
         self.opcao_selecionada = ctk.StringVar(value="")
 
         # radiobox turno D
@@ -66,8 +68,9 @@ class FormModific_Rapp_Elettr(ctk.CTkToplevel):
                                         variable=self.opcao_selecionada, 
                                         value="F")
         self.rb_F.grid(row=0, column=2, padx=(25, 50), pady=(10, 0), sticky="nsew")  
+        #########################################################################################################################
 
-        # Panel storico
+        # PANEL STORICO
         self.pnl_storico = ctk.CTkFrame(self.pnl_principal)
         self.pnl_storico.grid(row=1, column=0, padx=10, pady=(5, 5), sticky="nsew")  
 
@@ -76,8 +79,9 @@ class FormModific_Rapp_Elettr(ctk.CTkToplevel):
 
         self.lbl_storico = ctk.CTkTextbox(self.pnl_storico)
         self.lbl_storico.pack(expand=True, fill="both", padx=10, pady=(5, 10))    
+        #########################################################################################################################
 
-        # Panel button
+        # PANEL BUTTON
         self.pnl_button = ctk.CTkFrame(self.pnl_principal, height=40)
         self.pnl_button.grid(row=2, column=0, padx=10, pady=(5, 10), sticky="nsew")  
 
@@ -86,6 +90,7 @@ class FormModific_Rapp_Elettr(ctk.CTkToplevel):
         self.pnl_button.grid_columnconfigure(1, weight=0) # Coluna do botão OK
         self.pnl_button.grid_columnconfigure(2, weight=0) # Coluna do botão Cancelar
         self.pnl_button.grid_columnconfigure(3, weight=1)
+        #########################################################################################################################
 
         if self.registro_edicao:
             # Preenche o turno e desabilita os RadioButtons para não poder trocar o turno
@@ -118,15 +123,19 @@ class FormModific_Rapp_Elettr(ctk.CTkToplevel):
             else:
                 self.on_save(turno_selecionado, historico_digitado)
             self.destroy()
+        #########################################################################################################################
 
-        # criar botao salvar     
+
+        # CRIAR BOTAO SALVAR     
         self.btn_salvar = ctk.CTkButton(self.pnl_button, 
                                         text="OK", 
                                         font=("Consolas", 20, "bold"), 
                                         anchor="center", 
                                         width=150,
                                         command=click_btn_salvar)   
-        self.btn_salvar.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")  
+        self.btn_salvar.grid(row=0, column=1, padx=10, pady=10, sticky="nsew") 
+        #########################################################################################################################
+
 
         # BOTAO DE CANCELAR
         def click_btn_cancelar():
@@ -140,3 +149,4 @@ class FormModific_Rapp_Elettr(ctk.CTkToplevel):
                                           command=click_btn_cancelar,
                                           fg_color="transparent", border_width=1)   
         self.btn_cancelar.grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
+        #########################################################################################################################
