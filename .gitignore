@@ -1,16 +1,19 @@
-arquivos
-PDF
-Fotos
-src/imagens/
 *.pyc
 scheda
 
-
 # Ambiente Virtual
 .venv/
+env/
 
 # Banco de Dados SQLite
 *.db
 
 # Cache do Python
 __pycache__/
+
+# Ignorar pastas de compilação do PyInstaller
+build/
+dist/
+
+# Ignorar ficheiros executáveis soltos
+*.exe

@@ -15,9 +15,11 @@
 import os
 import customtkinter as ctk
 
+from tkinter import filedialog
 from util import format_form, carrega_imagem, exec_cerca_PDF, somente_maiusculas, exec_scheda_tec, exec_rapp_elettr, exec_cerca_foto_incestatura, verifica_conexao_server
 from frmscheda_tecnica import FormSchedaTecnica
 from frmrapp_elettr import FormRappElettr
+from url_api import CAMINHO_LOGO, salvar_caminho_logo
 
 ctk.set_default_color_theme("dark-blue")
 
@@ -28,8 +30,6 @@ janela_rapp_eletr = None
 frmPrincipal = ctk.CTk()
 format_form(440, 710, frmPrincipal)
 frmPrincipal.title("Rapportino Elettronico")
-caminho_icone = os.path.join(os.path.dirname(__file__), "imagens", "logo_alexia.ico")
-frmPrincipal.iconbitmap(caminho_icone)
 frmPrincipal.resizable(False, False)
 ###############################################################################################################################
 
@@ -38,16 +38,46 @@ pnl_principal = ctk.CTkFrame(frmPrincipal)
 pnl_principal.pack(fill="both", expand=True, pady=20, padx=20)
 ###############################################################################################################################
 
-# TITULO - IMAGEM
-logo_img = carrega_imagem(r"src\imagens\logo.png", 310, 65)
-lbl_titulo = ctk.CTkLabel(pnl_principal, image=logo_img, text="")
-lbl_titulo.pack(pady=50)
+# LOGO IMAGEM
+lbl_logo = ctk.CTkLabel(pnl_principal, text="", cursor="hand2")
+lbl_logo.pack(pady=20)
+
+# Define o que acontece ao clicar na Label
+def ao_clicar_no_logo(event):
+    # Abre a janela do Windows para o utilizador escolher a foto
+    novo_caminho = filedialog.askopenfilename(title="Seleziona il Logo",
+        filetypes=[("Immagini", "*.png *.jpg *.jpeg *.bmp")])
+    
+    if novo_caminho:
+        # Salva a preferência no config.txt
+        salvar_caminho_logo(novo_caminho)
+        
+        # Atualiza a tela imediatamente sem precisar reiniciar o sistema
+        try:
+            img_atualizada = carrega_imagem(novo_caminho, 310, 80)
+            lbl_logo.configure(image=img_atualizada, text="", height=80)
+        except Exception as e:
+            print(f"Erro ao carregar nova imagem: {e}")
+
+# Associa o evento do Botão Esquerdo do Mouse ("<Button-1>") à nossa função
+lbl_logo.bind("<Button-1>", ao_clicar_no_logo)
+
+# Lógica de inicialização (Quando o programa arranca)
+if CAMINHO_LOGO and os.path.exists(CAMINHO_LOGO):
+    try:
+        logo_img = carrega_imagem(CAMINHO_LOGO, 310, 80)
+        lbl_logo.configure(image=logo_img)
+    except Exception:
+        lbl_logo.configure(text="Logo qui", font=("Consolas", 20, "underline"), text_color="blue", height=120)
+else:        
+    lbl_logo.configure(text="Logo qui", font=("Consolas", 20, "underline"), text_color="blue", height=120)
 ###############################################################################################################################
 
 # CODIGO DA MATRIZ - LABEL
 lbl_codmatrice = ctk.CTkLabel(pnl_principal, text="Articolo", font=("Consolas", 20, "bold", "italic"), anchor="center")
-lbl_codmatrice.pack(padx=100, fill="x")
+lbl_codmatrice.pack(padx=100, pady=(40, 0), fill="x")
 ###############################################################################################################################
+
 
 # CODIGO MATRICE _ EDIT
 edit_matrice = ctk.CTkEntry(pnl_principal, width=320, justify="center", placeholder_text="Articolo", font=("Consolas", 48, "bold"))
