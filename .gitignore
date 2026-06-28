@@ -1,5 +1,8 @@
 *.pyc
 scheda
+arquivos
+fotos
+pdf
 
 # Ambiente Virtual
 .venv/
