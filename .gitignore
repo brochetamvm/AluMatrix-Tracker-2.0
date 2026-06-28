@@ -1,5 +1,10 @@
+
+# ARQUIVOS COMUNS
 *.pyc
 scheda
+server/arquivos/
+server/fotos/
+server/pdf/
 arquivos
 fotos
 pdf
